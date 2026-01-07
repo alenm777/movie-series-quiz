@@ -8,93 +8,103 @@ import {
   Stack,
   LinearProgress,
 } from "@mui/material";
-import { getPopularMovies } from "../api/tmdb";
+import {
+  getPopularMovies,
+  getMovieCredits,
+  getGenres,
+} from "../api/tmdb";
 
 function shuffle(array) {
   return [...array].sort(() => Math.random() - 0.5);
 }
 
+const QUESTION_TYPES = ["year", "genre", "actor"];
+
 function Quiz() {
   const [movies, setMovies] = useState([]);
+  const [genres, setGenres] = useState([]);
   const [current, setCurrent] = useState(0);
   const [options, setOptions] = useState([]);
+  const [question, setQuestion] = useState("");
+  const [correctAnswer, setCorrectAnswer] = useState("");
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [selected, setSelected] = useState(null);
   const [finished, setFinished] = useState(false);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadMovies();
+    loadGame();
   }, []);
 
-  async function loadMovies() {
-    try {
-      const data = await getPopularMovies();
+  async function loadGame() {
+    const moviesData = await getPopularMovies();
+    const genresData = await getGenres();
 
-      setMovies(data.slice(0, 10));
-      setCurrent(0);
-      setScore(0);
-      setFinished(false);
-      setError(null);
-    } catch (err) {
-      setError("No se pudieron cargar las películas");
-    }
+    setMovies(moviesData.slice(0, 10));
+    setGenres(genresData);
+    setCurrent(0);
+    setScore(0);
+    setFinished(false);
   }
 
   useEffect(() => {
     if (movies.length === 0 || finished) return;
-
-    const correct = movies[current].title;
-
-    const incorrect = shuffle(
-      movies
-        .filter((_, i) => i !== current)
-        .map((m) => m.title)
-    ).slice(0, 3);
-
-    setOptions(shuffle([correct, ...incorrect]));
-    setAnswered(false);
-    setSelected(null);
+    generateQuestion();
   }, [current, movies, finished]);
 
-  if (error) return <p>{error}</p>;
-  if (movies.length === 0) return <p>Cargando...</p>;
+  async function generateQuestion() {
+    const movie = movies[current];
+    const type = QUESTION_TYPES[Math.floor(Math.random() * QUESTION_TYPES.length)];
 
-  if (finished) {
-    const percentage = Math.round((score / movies.length) * 100);
+    // 🎬 AÑO
+    if (type === "year") {
+      const year = movie.release_date.split("-")[0];
+      setQuestion("¿En qué año se estrenó esta película?");
+      setCorrectAnswer(year);
 
-    return (
-      <Card>
-        <CardContent sx={{ textAlign: "center" }}>
-          <Typography variant="h4" gutterBottom>
-            🎉 Juego terminado
-          </Typography>
+      const years = shuffle([
+        year,
+        `${Number(year) - 1}`,
+        `${Number(year) + 1}`,
+        `${Number(year) - 2}`,
+      ]);
 
-          <Typography variant="h6">
-            Puntaje: {score} / {movies.length}
-          </Typography>
+      setOptions(years);
+    }
 
-          <Typography sx={{ mt: 1, mb: 2 }}>
-            Resultado: {percentage}%
-          </Typography>
+    // 🎭 GÉNERO
+    if (type === "genre") {
+      const movieGenreId = movie.genre_ids[0];
+      const genre = genres.find((g) => g.id === movieGenreId);
 
-          <Typography sx={{ mb: 3 }}>
-            {percentage >= 80 && "🔥 Excelente! Sos un cinéfilo"}
-            {percentage >= 50 && percentage < 80 && "👏 Muy bien!"}
-            {percentage < 50 && "🎬 A seguir mirando pelis"}
-          </Typography>
+      setQuestion("¿A qué género pertenece esta película?");
+      setCorrectAnswer(genre.name);
 
-          <Button variant="contained" onClick={loadMovies}>
-            Jugar de nuevo
-          </Button>
-        </CardContent>
-      </Card>
-    );
+      const otherGenres = shuffle(
+        genres.filter((g) => g.id !== genre.id).slice(0, 3)
+      ).map((g) => g.name);
+
+      setOptions(shuffle([genre.name, ...otherGenres]));
+    }
+
+    // 🎤 ACTOR
+    if (type === "actor") {
+      const cast = await getMovieCredits(movie.id);
+      const mainActor = cast[0]?.name;
+
+      setQuestion("¿Quién es el actor principal de esta película?");
+      setCorrectAnswer(mainActor);
+
+      const otherActors = shuffle(
+        cast.slice(1, 6).map((a) => a.name)
+      ).slice(0, 3);
+
+      setOptions(shuffle([mainActor, ...otherActors]));
+    }
+
+    setAnswered(false);
+    setSelected(null);
   }
-
-  const movie = movies[current];
-  const progress = ((current + 1) / movies.length) * 100;
 
   function handleAnswer(option) {
     if (answered) return;
@@ -102,7 +112,7 @@ function Quiz() {
     setSelected(option);
     setAnswered(true);
 
-    if (option === movie.title) {
+    if (option === correctAnswer) {
       setScore((prev) => prev + 1);
     }
   }
@@ -115,6 +125,27 @@ function Quiz() {
     }
   }
 
+  if (movies.length === 0) return <p>Cargando...</p>;
+
+  if (finished) {
+    return (
+      <Card>
+        <CardContent sx={{ textAlign: "center" }}>
+          <Typography variant="h4">🎉 Juego terminado</Typography>
+          <Typography variant="h6">
+            Puntaje: {score} / {movies.length}
+          </Typography>
+          <Button sx={{ mt: 2 }} variant="contained" onClick={loadGame}>
+            Jugar de nuevo
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const movie = movies[current];
+  const progress = ((current + 1) / movies.length) * 100;
+
   return (
     <Card>
       <LinearProgress variant="determinate" value={progress} />
@@ -123,9 +154,9 @@ function Quiz() {
         component="img"
         height="400"
         image={
-          movie.poster_path
-            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-            : "https://via.placeholder.com/500x750?text=Sin+imagen"
+          movie.backdrop_path
+            ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+            : `https://image.tmdb.org/t/p/w500${movie.poster_path}`
         }
         alt={movie.title}
       />
@@ -135,20 +166,15 @@ function Quiz() {
           Pregunta {current + 1} / {movies.length}
         </Typography>
 
-        <Typography sx={{ mb: 2 }}>
-          ¿Cuál es el título de esta película?
-        </Typography>
+        <Typography sx={{ mb: 2 }}>{question}</Typography>
 
         <Stack spacing={1}>
           {options.map((option) => {
-            const isCorrect = option === movie.title;
-            const isSelected = option === selected;
-
             let color = "primary";
 
             if (answered) {
-              if (isCorrect) color = "success";
-              else if (isSelected) color = "error";
+              if (option === correctAnswer) color = "success";
+              else if (option === selected) color = "error";
             }
 
             return (

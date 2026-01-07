@@ -14,3 +14,13 @@ export async function getPopularMovies() {
   const response = await api.get("/movie/popular");
   return response.data.results;
 }
+
+export async function getMovieCredits(movieId) {
+  const response = await api.get(`/movie/${movieId}/credits`);
+  return response.data.cast;
+}
+
+export async function getGenres() {
+  const response = await api.get("/genre/movie/list");
+  return response.data.genres;
+}
