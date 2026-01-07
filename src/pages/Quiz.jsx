@@ -21,31 +21,77 @@ function Quiz() {
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [finished, setFinished] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function load() {
-      const data = await getPopularMovies();
-      setMovies(data.slice(0, 10));
-    }
-    load();
+    loadMovies();
   }, []);
 
+  async function loadMovies() {
+    try {
+      const data = await getPopularMovies();
+
+      setMovies(data.slice(0, 10));
+      setCurrent(0);
+      setScore(0);
+      setFinished(false);
+      setError(null);
+    } catch (err) {
+      setError("No se pudieron cargar las películas");
+    }
+  }
+
   useEffect(() => {
-    if (movies.length === 0) return;
+    if (movies.length === 0 || finished) return;
 
     const correct = movies[current].title;
 
-    const incorrect = movies
-      .filter((_, i) => i !== current)
-      .map((m) => m.title)
-      .slice(0, 3);
+    const incorrect = shuffle(
+      movies
+        .filter((_, i) => i !== current)
+        .map((m) => m.title)
+    ).slice(0, 3);
 
     setOptions(shuffle([correct, ...incorrect]));
     setAnswered(false);
     setSelected(null);
-  }, [current, movies]);
+  }, [current, movies, finished]);
 
+  if (error) return <p>{error}</p>;
   if (movies.length === 0) return <p>Cargando...</p>;
+
+  if (finished) {
+    const percentage = Math.round((score / movies.length) * 100);
+
+    return (
+      <Card>
+        <CardContent sx={{ textAlign: "center" }}>
+          <Typography variant="h4" gutterBottom>
+            🎉 Juego terminado
+          </Typography>
+
+          <Typography variant="h6">
+            Puntaje: {score} / {movies.length}
+          </Typography>
+
+          <Typography sx={{ mt: 1, mb: 2 }}>
+            Resultado: {percentage}%
+          </Typography>
+
+          <Typography sx={{ mb: 3 }}>
+            {percentage >= 80 && "🔥 Excelente! Sos un cinéfilo"}
+            {percentage >= 50 && percentage < 80 && "👏 Muy bien!"}
+            {percentage < 50 && "🎬 A seguir mirando pelis"}
+          </Typography>
+
+          <Button variant="contained" onClick={loadMovies}>
+            Jugar de nuevo
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const movie = movies[current];
   const progress = ((current + 1) / movies.length) * 100;
@@ -57,15 +103,15 @@ function Quiz() {
     setAnswered(true);
 
     if (option === movie.title) {
-      setScore(score + 1);
+      setScore((prev) => prev + 1);
     }
   }
 
   function nextQuestion() {
     if (current < movies.length - 1) {
-      setCurrent(current + 1);
+      setCurrent((prev) => prev + 1);
     } else {
-      alert(`Juego terminado 🎉 Puntaje final: ${score}/${movies.length}`);
+      setFinished(true);
     }
   }
 
@@ -76,7 +122,11 @@ function Quiz() {
       <CardMedia
         component="img"
         height="400"
-        image={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+        image={
+          movie.poster_path
+            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+            : "https://via.placeholder.com/500x750?text=Sin+imagen"
+        }
         alt={movie.title}
       />
 
@@ -94,7 +144,7 @@ function Quiz() {
             const isCorrect = option === movie.title;
             const isSelected = option === selected;
 
-            let color = "outlined";
+            let color = "primary";
 
             if (answered) {
               if (isCorrect) color = "success";
@@ -121,7 +171,9 @@ function Quiz() {
             fullWidth
             onClick={nextQuestion}
           >
-            {current === movies.length - 1 ? "Ver resultado" : "Siguiente"}
+            {current === movies.length - 1
+              ? "Ver resultado"
+              : "Siguiente"}
           </Button>
         )}
 
