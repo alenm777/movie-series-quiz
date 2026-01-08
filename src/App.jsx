@@ -1,33 +1,33 @@
-import { Container, Typography, Button } from "@mui/material";
+import { Container, Typography, Button, Stack } from "@mui/material";
 import { useState } from "react";
-import Quiz from "./pages/Quiz";
+import MovieQuiz from "./pages/MovieQuiz";
+import SeriesQuiz from "./pages/SeriesQuiz";
 
-function App() {
-  const [start, setStart] = useState(false);
+export default function App() {
+  const [mode, setMode] = useState(null);
 
   return (
-    <Container maxWidth="sm" sx={{ textAlign: "center", mt: 8 }}>
-      {!start ? (
+    <Container maxWidth="sm" sx={{ mt: 6, textAlign: "center" }}>
+      {!mode ? (
         <>
           <Typography variant="h4" gutterBottom>
             🎬 Movie & Series Quiz
           </Typography>
-          <Typography sx={{ mb: 3 }}>
-            ¿Cuánto sabés de películas y series?
-          </Typography>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={() => setStart(true)}
-          >
-            Comenzar
-          </Button>
+
+          <Stack spacing={2}>
+            <Button variant="contained" onClick={() => setMode("movie")}>
+              Jugar con Películas
+            </Button>
+            <Button variant="outlined" onClick={() => setMode("series")}>
+              Jugar con Series
+            </Button>
+          </Stack>
         </>
+      ) : mode === "movie" ? (
+        <MovieQuiz />
       ) : (
-        <Quiz />
+        <SeriesQuiz />
       )}
     </Container>
   );
 }
-
-export default App;
